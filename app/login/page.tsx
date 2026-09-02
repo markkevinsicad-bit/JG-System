@@ -31,8 +31,8 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-navy px-4">
       <div className="w-full max-w-sm animate-scale-in">
         <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-eng-blue shadow-lg">
-            <Flame className="h-7 w-7 text-white" />
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-eng-blue shadow-lg overflow-hidden">
+        <img src="public/logo.png" alt="JG Crystal King" className="h-full w-full object-contain p-1.5" />
           </div>
           <h1 className="text-xl font-bold text-white">JG Crystal King</h1>
           <p className="text-sm text-white/50">Engineering Services</p>
