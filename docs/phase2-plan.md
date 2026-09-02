@@ -1,58 +1,34 @@
-# Phase 2 Plan
+# Phase 2 — Completion Notes
 
-This document lists exactly what Phase 2 will implement, continuing
-directly from the Phase 1 codebase. Nothing here has been built yet.
+Phase 2 is complete. This file now documents what was delivered and any
+scope notes, rather than a forward-looking plan (see README.md Section 15
+for known limitations).
 
-## Authentication & Authorization
-- Real Supabase sign-in/sign-out wiring on the login page
-- Protected routes enforced server-side
-- Full Admin/Staff role enforcement across every page and action
-- Full production RLS policies (replacing Phase 1's minimal foundation)
+## Delivered
 
-## Projects
-- Real CRUD via Supabase (create/edit/status changes)
-- Project details backed by live data
-- Budget management per project
-- Project monitoring/status transitions
+- Real Supabase Authentication (sign in/out, password reset, inactive
+  account blocking), enforced server-side on every protected route
+- Full Admin/Staff permission model enforced via RLS (not just UI hiding)
+- Projects: real CRUD, archive/restore, budget-vs-actual calculations
+- Expenses: submission, staff edit-own-pending, admin approve/reject with
+  reason, receipt upload to private Storage
+- Documents: upload/view (signed URLs)/delete against private Storage
+- Staff management: admin-only, using an isolated service-role client
+- Settings: profile editing, password change, admin-managed categories
+  and service types
+- Dashboard & Reports: fully live Supabase data, role-aware
+- CSV export + print-friendly report view
+- Activity log (admin-only, all key actions recorded)
+- Global search across projects/expenses/documents
+- Calendar showing real project start/end dates
+- Toasts, confirm dialogs, loading states, empty states, 404/unauthorized
+  pages throughout
 
-## Expenses
-- Real Supabase CRUD (replacing demo data)
-- Expense submission with server-side validation
-- Receipt upload to Supabase Storage
-- Expense approval / rejection workflow
-- Staff restrictions (own expenses only, edit-recent-only, etc.)
+## Scope notes
 
-## Budgets
-- Live budget-vs-actual calculations
-- Over-budget alerts / status thresholds enforced server-side
-
-## Documents
-- Supabase Storage wiring for the `project-documents` bucket
-- Secure upload/download with per-project access control
-- File permissions
-
-## Search
-- Global search across projects, expenses, vendors, and documents
-
-## Reports
-- Real-time data (replacing demo data)
-- Date/project/category filters
-- PDF export
-- Excel/CSV export
-
-## Activity Logs
-- Real database-backed activity tracking for key actions
-
-## Notifications
-- In-app notifications for approvals, rejections, and important events
-
-## Testing
-- Functional testing across all modules
-- RLS policy testing (staff cannot see/do what they shouldn't)
-- Responsive testing across breakpoints
-- Production build verification
-
-## Deployment
-- Production environment variable checklist
-- Vercel production configuration
-- Final pre-launch checklist
+- PDF export was intentionally not built; CSV + browser print cover the
+  same need without an unnecessarily complex reporting engine, per the
+  Phase 2 brief's guidance to avoid over-engineering.
+- In-app notifications and theme switching are stubbed in the UI but not
+  wired to real events — flagged in README.md Section 15 rather than
+  silently left out.

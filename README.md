@@ -3,75 +3,53 @@
 An internal **Project → Budget → Expense → Document → Monitoring → Reporting**
 management system built for **JG Crystal King Engineering Services**.
 
-> **Status: Phase 1 — Foundation.** This is the UI, architecture, and
-> database foundation only. See [docs/phase2-plan.md](docs/phase2-plan.md)
-> for what's intentionally deferred to Phase 2.
+> **Status: Phase 2 — Complete.** Authentication, Admin/Staff permissions,
+> RLS, and all core workflows are fully functional against a real Supabase
+> backend. This is the final development phase.
 
 ---
 
-## 1. What this application is
+## 1. Overview
 
 A modern SaaS-style dashboard that helps a small engineering-services
-company track projects, budgets, expenses, documents, and staff — without
-the weight of a full accounting/ERP system.
+company track projects, budgets, expenses, documents, and staff. It is
+intentionally **not** a full accounting/ERP system — it stays focused on
+day-to-day project and expense tracking.
 
-## 2. Technology stack
+## 2. Technology
 
 - [Next.js](https://nextjs.org) (App Router) + TypeScript + React
 - [Tailwind CSS](https://tailwindcss.com)
-- [Supabase](https://supabase.com) — PostgreSQL, Authentication, Storage
+- [Supabase](https://supabase.com) — PostgreSQL, Authentication, Storage, RLS
+- [Zod](https://zod.dev) for server-side validation
 - [Recharts](https://recharts.org) for charts
-- [Lucide](https://lucide.dev) for icons
 
-## 3. Requirements
-
-- Node.js 18.18+ (Node 20 LTS recommended)
-- npm 9+
-- A free [Supabase](https://supabase.com) account/project
-
-## 4. Installation
+## 3. Local setup
 
 ```bash
 npm install
+cp .env.example .env.local   # fill in the values, see below
+npm run dev
 ```
 
-## 5. Environment variables
+Open [http://localhost:3000](http://localhost:3000) — you'll be redirected
+to `/login`.
 
-Copy the example file and fill in your Supabase project's public values:
+## 4. Environment variables
 
-```bash
-cp .env.example .env.local
-```
+| Variable | Where to find it | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Settings → API | Public |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Settings → API | Public — protected entirely by RLS |
+| `NEXT_PUBLIC_SITE_URL` | Your deployed URL (or `http://localhost:3000`) | Used to build password-reset links |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → `service_role` | **Private.** Server-only. Required only for the Staff → Add Staff feature. Never prefix this with `NEXT_PUBLIC_`. |
 
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR-ANON-PUBLIC-KEY
-```
+## 5. Supabase setup
 
-You'll find both under **Supabase Dashboard → Settings → API**.
-Never commit `.env.local` or paste a service-role key into this project.
+### Migrations
 
-## 6. Supabase setup
-
-1. Create a new Supabase project at [supabase.com](https://supabase.com).
-2. Copy the Project URL and `anon` public key into `.env.local` (step 5).
-3. Apply the database migrations (step 7).
-4. Authentication is enabled by default on new Supabase projects — no
-   extra configuration is required for Phase 1.
-
-## 7. Database migrations
-
-Migration files live in `supabase/migrations/` and are numbered in the
-order they must run:
-
-```
-0001_profiles.sql
-0002_projects.sql
-0003_expenses.sql
-0004_documents_activity.sql
-```
-
-**Option A — Supabase CLI (recommended)**
+Migration files live in `supabase/migrations/`, numbered in run order
+(`0001` → `0006`). Apply them via the Supabase CLI:
 
 ```bash
 npm install -g supabase
@@ -80,70 +58,139 @@ supabase link --project-ref YOUR-PROJECT-REF
 supabase db push
 ```
 
-**Option B — SQL Editor**
+...or paste each file's contents into the **SQL Editor** in order. They are
+additive-only and safe to re-run (`if not exists` / `on conflict do
+nothing` throughout).
 
-Open **Supabase Dashboard → SQL Editor**, paste each migration file's
-contents in order (0001 → 0004), and run them one at a time.
+### Storage
 
-These migrations are additive only — they never drop or reset existing
-data.
+Migrations `0004` and `0006` provision two **private** buckets:
+`project-documents` and `receipts`. No manual setup is needed — RLS-backed
+storage policies are created by the migrations.
 
-## 8. Local development
+### Authentication
+
+Supabase Auth is enabled by default. No extra configuration is required
+for email/password sign-in. If you want branded password-reset emails,
+customize the templates under Supabase → Authentication → Email Templates.
+
+### Creating your first Admin account
+
+The simplest path: sign up a user manually in **Supabase → Authentication
+→ Users → Add User** (with a password, email confirmed), then in the
+**Table Editor**, open `profiles` and change that user's `role` to
+`admin`. From there, that Admin can use the in-app **Staff → Add Staff**
+flow for everyone else.
+
+## 6. Authentication
+
+- Real Supabase email/password sign-in, sign-out, and password reset.
+- Inactive accounts (`profiles.status = 'inactive'`) are blocked at sign-in
+  even with correct credentials.
+- All `(app)` routes are protected server-side by `lib/auth.ts` — there is
+  no client-side-only route guarding.
+
+## 7. Permissions
+
+**Admin** — full access: manage projects, budgets, staff, categories,
+service types; approve/reject expenses; view all reports and activity.
+
+**Staff** — sign in, view projects, submit and manage their own pending
+expenses, upload receipts/documents, use search. Staff cannot approve
+expenses, change budgets, manage other users, or access other staff
+members' expense data.
+
+Permissions are enforced **at the database level via RLS**, not just by
+hiding UI buttons — see Section 9.
+
+## 8. Database
+
+| Table | Purpose |
+|---|---|
+| `profiles` | User identity, role (`admin`/`staff`), status (`active`/`inactive`) |
+| `projects` | Project records, budget, contract value, status, timeline |
+| `service_types` | Admin-manageable list of engineering service types |
+| `expense_categories` | Admin-manageable list of expense categories |
+| `expenses` | Expense records, approval workflow, rejection reason |
+| `documents` | Project/general document metadata (files live in Storage) |
+| `activity_logs` | Immutable audit trail of key actions |
+
+Budget math: **Remaining = Budget − Approved Expenses.** Pending and
+rejected expenses never count as actual spend.
+
+## 9. RLS & Security
+
+- RLS is enabled on every table — see `supabase/migrations/0006_rls_policies.sql`.
+- Two `security definer` helper functions (`is_admin()`, `is_active_user()`)
+  centralize the role check so policies stay simple and consistent.
+- Staff can only `select`/`update` their **own** expenses while `pending`;
+  only Admins can approve, reject, or delete any expense.
+- Storage buckets (`project-documents`, `receipts`) are **private** with
+  matching RLS policies — files are served via short-lived signed URLs,
+  never public URLs.
+- The Supabase **service-role key** is used in exactly one place
+  (`lib/supabase/admin.ts`, guarded by the `server-only` package) for
+  admin-initiated staff account creation. It is never sent to the browser.
+
+## 10. Storage
+
+Receipts upload to the private `receipts` bucket; project/general
+documents upload to `project-documents`. Both validate file type
+(JPG/PNG/PDF) and size (10MB max) server-side before upload. Viewing a
+document generates a 60-second signed URL rather than exposing a public
+one.
+
+## 11. Local development
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). You'll be redirected
-to `/login`, and after Phase 2 wires up real authentication, into
-`/dashboard`.
-
-## 9. Build command
+## 12. Production build
 
 ```bash
+npm run lint
 npm run build
 ```
 
-## 10. GitHub setup
-
-```bash
-git init
-git add .
-git commit -m "Phase 1: foundation"
-git branch -M main
-git remote add origin <your-repo-url>
-git push -u origin main
-```
-
-`.git`, `node_modules`, and all `.env*` files are already excluded via
-`.gitignore`.
-
-## 11. Vercel deployment preparation
+## 13. Vercel deployment
 
 1. Push this repository to GitHub.
 2. Import it in [Vercel](https://vercel.com/new).
-3. Add the two environment variables from step 5 in the Vercel project
-   settings (Production and Preview).
-4. Deploy — no extra configuration is required; this is a standard
-   Next.js App Router project.
+3. Add all four environment variables from Section 4 under **Project
+   Settings → Environment Variables** (Production and Preview). Missing
+   the Supabase URL/anon key will crash the middleware on every request.
+4. Set `NEXT_PUBLIC_SITE_URL` to your Vercel deployment URL.
+5. Deploy.
 
-## 12. Phase 1 limitations
+## 14. QA results
 
-Phase 1 intentionally does **not** include:
+Manually tested and passing:
 
-- Working sign-in (the login page is UI-only for now)
-- Enforced role-based permissions (Admin vs Staff)
-- Production-grade RLS policies (minimal safe policies only)
-- Real Supabase data — all lists/dashboards use isolated demo data
-  (see `lib/demo-data.ts`)
-- Expense approval workflow logic
-- File upload to Supabase Storage
-- Reports export (PDF/Excel)
-- Notifications
+- Sign in (valid/invalid credentials), sign out, session persistence, password reset
+- Inactive account correctly blocked at login
+- Admin: create/edit/archive/restore project, approve/reject expense,
+  add/deactivate staff, manage categories & service types, upload/delete
+  document, view reports, export CSV, view activity log
+- Staff: create expense, upload receipt, edit own pending expense, view
+  own expenses only — confirmed staff cannot approve expenses or see
+  budget/staff/reports pages (nav items hidden **and** routes
+  admin-gated server-side)
+- Budget math verified: ₱100,000 budget / ₱40,000 approved → ₱60,000
+  remaining, 40% used; ₱100,000 budget / ₱110,000 approved → −₱10,000
+  remaining, 110% used, "Over Budget" state shown
+- `npm run build` and `npm run lint` both pass with zero errors/warnings
 
-## 13. What remains for Phase 2
+## 15. Known limitations
 
-See [docs/phase2-plan.md](docs/phase2-plan.md) for the full breakdown.
+- In-app notifications (bell icon) are UI-only — no real notification
+  events are generated yet.
+- PDF export is not implemented; CSV export and a browser print view
+  (`window.print()` with dedicated print CSS) are provided instead.
+- Appearance/theme settings (light/dark/system) are UI-only.
+- Pagination is not yet implemented on large tables (expenses, activity
+  log limited to the 100 most recent entries) — acceptable at current
+  scale, worth revisiting if data volume grows significantly.
 
 ---
 
@@ -151,34 +198,23 @@ See [docs/phase2-plan.md](docs/phase2-plan.md) for the full breakdown.
 
 ```
 app/
-  (app)/            # Authenticated app shell (sidebar + header + pages)
-    dashboard/
-    projects/
-    expenses/
-    budgets/
-    reports/
-    calendar/
-    documents/
-    staff/
-    settings/
-  login/
+  (app)/              # Authenticated shell (sidebar + header)
+    dashboard/ projects/ projects/new/ projects/[id]/ projects/[id]/edit/
+    expenses/ expenses/new/ expenses/[id]/edit/
+    budgets/ reports/ calendar/ documents/ staff/ activity/ search/ settings/
+  login/ forgot-password/ reset-password/ unauthorized/
 components/
-  layout/ navigation/ dashboard/ projects/ expenses/ budgets/
-  reports/ calendar/ documents/ staff/ settings/ forms/ ui/ shared/
+  navigation/ dashboard/ projects/ expenses/ documents/ staff/
+  settings/ calendar/ reports/ ui/ shared/
 lib/
-  supabase/          # client.ts, server.ts, middleware.ts
-  demo-data.ts        # isolated Phase 1 mock data
-  utils.ts
+  supabase/       # client.ts, server.ts, middleware.ts, admin.ts (service-role, server-only)
+  actions/        # server actions: auth, project, expense, document, staff, settings
+  data/           # server-side data-fetching + financial calculations
+  auth.ts         # requireUser() / requireAdmin() route guards
+  validations.ts  # Zod schemas
+  activity.ts     # activity log helper
+  export-csv.ts
 types/
-supabase/migrations/  # numbered SQL migration files
+supabase/migrations/  # 0001–0006, numbered, additive-only
 docs/
 ```
-
-## Security notes
-
-- No service-role key, password, or secret is ever present in this
-  project.
-- RLS is enabled on every table; Phase 1 ships only the minimum policies
-  needed for the authentication foundation to function safely.
-- `.env.local` is git-ignored; only `.env.example` (placeholders) is
-  committed.

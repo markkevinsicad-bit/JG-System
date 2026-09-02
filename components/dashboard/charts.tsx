@@ -13,13 +13,12 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { expenseByCategoryDemo, expensesOverTimeDemo } from "@/lib/demo-data";
 import { formatPHP } from "@/lib/utils";
 
-export function ExpensesOverviewChart() {
+export function ExpensesOverviewChart({ data }: { data: { month: string; amount: number }[] }) {
   return (
     <ResponsiveContainer width="100%" height={260}>
-      <AreaChart data={expensesOverTimeDemo}>
+      <AreaChart data={data}>
         <defs>
           <linearGradient id="expenseFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#1f5fd6" stopOpacity={0.25} />
@@ -51,12 +50,20 @@ export function ExpensesOverviewChart() {
   );
 }
 
-export function ExpenseByCategoryChart() {
+export function ExpenseByCategoryChart({ data }: { data: { name: string; value: number; color: string }[] }) {
+  if (data.length === 0) {
+    return (
+      <div className="flex h-[260px] items-center justify-center text-sm text-gray-400">
+        No approved expenses yet
+      </div>
+    );
+  }
+
   return (
     <ResponsiveContainer width="100%" height={260}>
       <PieChart>
         <Pie
-          data={expenseByCategoryDemo}
+          data={data}
           dataKey="value"
           nameKey="name"
           innerRadius={62}
@@ -64,7 +71,7 @@ export function ExpenseByCategoryChart() {
           paddingAngle={2}
           animationDuration={900}
         >
-          {expenseByCategoryDemo.map((entry, i) => (
+          {data.map((entry, i) => (
             <Cell key={i} fill={entry.color} />
           ))}
         </Pie>

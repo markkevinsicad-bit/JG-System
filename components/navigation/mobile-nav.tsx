@@ -2,19 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FolderKanban, Plus, Receipt, Menu } from "lucide-react";
+import { LayoutDashboard, FolderKanban, Plus, Receipt, Menu, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { navItems } from "./sidebar";
+import { signOutAction } from "@/lib/actions/auth-actions";
+import { Profile } from "@/types";
 
-export function MobileNav() {
+export function MobileNav({ profile }: { profile: Profile }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
+  const isAdmin = profile.role === "admin";
+  const items = navItems.filter((i) => !i.adminOnly || isAdmin);
 
-  const items = [
+  const primary = [
     { href: "/dashboard", label: "Home", icon: LayoutDashboard },
     { href: "/projects", label: "Projects", icon: FolderKanban },
-    { href: "/expenses/new", label: "Add", icon: Plus, isAction: true },
+    { href: "/expenses/new", label: "Add", icon: Plus },
     { href: "/expenses", label: "Expenses", icon: Receipt },
   ];
 
@@ -29,8 +33,8 @@ export function MobileNav() {
             className="absolute bottom-16 left-0 right-0 rounded-t-2xl bg-white p-3 shadow-lg animate-fade-in-up"
             onClick={(e) => e.stopPropagation()}
           >
-            {navItems
-              .filter((i) => !items.some((b) => b.href === i.href))
+            {items
+              .filter((i) => !primary.some((b) => b.href === i.href))
               .map(({ href, label, icon: Icon }) => (
                 <Link
                   key={href}
@@ -42,12 +46,21 @@ export function MobileNav() {
                   {label}
                 </Link>
               ))}
+            <form action={signOutAction}>
+              <button
+                type="submit"
+                className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-red hover:bg-red-light"
+              >
+                <LogOut className="h-[18px] w-[18px]" />
+                Sign Out
+              </button>
+            </form>
           </div>
         </div>
       )}
 
       <nav className="fixed bottom-0 left-0 right-0 z-30 flex items-center justify-around border-t border-gray-border bg-white py-2 md:hidden">
-        {items.slice(0, 2).map(({ href, label, icon: Icon }) => {
+        {primary.slice(0, 2).map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (
             <Link
@@ -71,7 +84,7 @@ export function MobileNav() {
           <Plus className="h-6 w-6" />
         </Link>
 
-        {items.slice(3).map(({ href, label, icon: Icon }) => {
+        {primary.slice(3).map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (
             <Link

@@ -34,12 +34,20 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isAuthPage = request.nextUrl.pathname.startsWith("/login");
+  const publicPaths = ["/login", "/forgot-password", "/reset-password", "/unauthorized"];
+  const isPublicPage = publicPaths.some((p) => request.nextUrl.pathname.startsWith(p));
   const isPublicAsset = request.nextUrl.pathname.startsWith("/_next");
 
-  if (!user && !isAuthPage && !isPublicAsset && request.nextUrl.pathname !== "/") {
+  if (!user && !isPublicPage && !isPublicAsset && request.nextUrl.pathname !== "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  // Signed-in users shouldn't see the login screen again.
+  if (user && request.nextUrl.pathname === "/login") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
