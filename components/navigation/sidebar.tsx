@@ -46,8 +46,8 @@ export function Sidebar({ profile }: { profile: Profile }) {
   return (
     <aside className="hidden h-screen w-64 flex-col border-r border-gray-border bg-navy text-white md:flex">
       <div className="flex items-center gap-2.5 px-6 py-6">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-eng-blue">
-          <Flame className="h-5 w-5 text-white" />
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-eng-blue overflow-hidden">
+          <img src="/logo.png" alt="JG Crystal King" className="h-full w-full object-contain p-1" />
         </div>
         <div>
           <p className="text-sm font-bold leading-tight">JG Crystal King</p>
