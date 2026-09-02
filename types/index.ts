@@ -55,20 +55,24 @@ export type ExpenseCategory = {
 };
 
 export type ExpenseStatus = "pending" | "approved" | "rejected";
-export type PaymentMethod = "cash" | "bank_transfer" | "card" | "other";
+export type PaymentMethod = "cash" | "bank_transfer" | "card" | "gcash" | "check" | "other";
 
 export type Expense = {
   id: string;
-  project_id: string;
+  project_id: string | null;
+  budget_id: string | null;
   category_id: string;
   description: string;
   amount: number;
   expense_date: string;
   vendor_name: string | null;
   payment_method: PaymentMethod;
+  reference_number: string | null;
+  notes: string | null;
   status: ExpenseStatus;
   submitted_by: string;
   receipt_path: string | null;
+  rejection_reason?: string | null;
   created_at: string;
   updated_at: string;
   // Joined display fields (demo data)
@@ -112,3 +116,64 @@ export type ActivityLog = {
 };
 
 export type BudgetStatus = "healthy" | "warning" | "near_limit" | "over_budget";
+
+export type BudgetPeriod = "monthly" | "quarterly" | "annual" | "custom";
+export type BudgetRecordStatus = "active" | "closed" | "archived";
+
+export type BudgetType = {
+  id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+};
+
+export type Budget = {
+  id: string;
+  budget_name: string;
+  budget_type_id: string;
+  project_id: string | null;
+  description: string | null;
+  budget_amount: number;
+  period_type: BudgetPeriod;
+  start_date: string;
+  end_date: string | null;
+  status: BudgetRecordStatus;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  // Joined display fields
+  budget_type_name?: string;
+  project_name?: string;
+};
+
+export type IncomeType = "project" | "other";
+export type IncomePaymentStatus = "pending" | "partially_received" | "received" | "cancelled";
+
+export type IncomeCategory = {
+  id: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+};
+
+export type Income = {
+  id: string;
+  project_id: string | null;
+  income_category_id: string;
+  income_type: IncomeType;
+  description: string;
+  expected_amount: number;
+  received_amount: number;
+  income_date: string;
+  payment_status: IncomePaymentStatus;
+  source_name: string | null;
+  reference_number: string | null;
+  notes: string | null;
+  attachment_path: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  // Joined display fields
+  project_name?: string;
+  category_name?: string;
+};

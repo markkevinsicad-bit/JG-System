@@ -79,7 +79,7 @@ export default async function ExpensesPage({
                         <p className="mt-0.5 text-xs text-red">Reason: {e.rejection_reason}</p>
                       )}
                     </td>
-                    <td className="px-5 py-3 text-gray-500">{e.projects?.name}</td>
+                    <td className="px-5 py-3 text-gray-500">{e.projects?.name ?? "General"}</td>
                     <td className="px-5 py-3 text-gray-500">{e.expense_categories?.name}</td>
                     <td className="whitespace-nowrap px-5 py-3 font-medium text-navy">{formatPHP(Number(e.amount))}</td>
                     {isAdmin && <td className="px-5 py-3 text-gray-500">{e.profiles?.full_name}</td>}

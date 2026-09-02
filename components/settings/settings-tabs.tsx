@@ -13,6 +13,10 @@ import {
   toggleCategoryAction,
   addServiceTypeAction,
   toggleServiceTypeAction,
+  addBudgetTypeAction,
+  toggleBudgetTypeAction,
+  addIncomeCategoryAction,
+  toggleIncomeCategoryAction,
   updateProfileAction,
   changePasswordAction,
 } from "@/lib/actions/settings-actions";
@@ -23,11 +27,15 @@ export function SettingsTabs({
   isAdmin,
   categories,
   serviceTypes,
+  budgetTypes,
+  incomeCategories,
 }: {
   profile: Profile;
   isAdmin: boolean;
   categories: { id: string; name: string; is_active: boolean }[];
   serviceTypes: { id: string; name: string; is_active: boolean }[];
+  budgetTypes: { id: string; name: string; is_active: boolean }[];
+  incomeCategories: { id: string; name: string; is_active: boolean }[];
 }) {
   const sections = ["Profile", "Appearance", ...(isAdmin ? ["System"] : []), "Security"];
   const [active, setActive] = useState("Profile");
@@ -131,6 +139,24 @@ export function SettingsTabs({
                 addAction={addServiceTypeAction}
                 toggleAction={toggleServiceTypeAction}
                 placeholder="New service type name"
+              />
+            </div>
+            <div className="border-t border-gray-border pt-6">
+              <CardHeader><CardTitle>Budget Types</CardTitle></CardHeader>
+              <ManagedListEditor
+                items={budgetTypes}
+                addAction={addBudgetTypeAction}
+                toggleAction={toggleBudgetTypeAction}
+                placeholder="New budget type name"
+              />
+            </div>
+            <div className="border-t border-gray-border pt-6">
+              <CardHeader><CardTitle>Income Categories</CardTitle></CardHeader>
+              <ManagedListEditor
+                items={incomeCategories}
+                addAction={addIncomeCategoryAction}
+                toggleAction={toggleIncomeCategoryAction}
+                placeholder="New income category name"
               />
             </div>
           </div>

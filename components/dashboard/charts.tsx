@@ -15,7 +15,8 @@ import {
 } from "recharts";
 import { formatPHP } from "@/lib/utils";
 
-export function ExpensesOverviewChart({ data }: { data: { month: string; amount: number }[] }) {
+export function ExpensesOverviewChart({ data }: { data: { month: string; amount: number; income?: number }[] }) {
+  const hasIncome = data.some((d) => d.income !== undefined);
   return (
     <ResponsiveContainer width="100%" height={260}>
       <AreaChart data={data}>
@@ -23,6 +24,10 @@ export function ExpensesOverviewChart({ data }: { data: { month: string; amount:
           <linearGradient id="expenseFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#1f5fd6" stopOpacity={0.25} />
             <stop offset="100%" stopColor="#1f5fd6" stopOpacity={0} />
+          </linearGradient>
+          <linearGradient id="incomeFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#16a34a" stopOpacity={0.2} />
+            <stop offset="100%" stopColor="#16a34a" stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
@@ -34,17 +39,13 @@ export function ExpensesOverviewChart({ data }: { data: { month: string; amount:
           tickFormatter={(v) => `₱${(v / 1000).toFixed(0)}k`}
         />
         <Tooltip
-          formatter={(value) => [formatPHP(Number(value)), "Expenses"]}
+          formatter={(value, name) => [formatPHP(Number(value)), name === "amount" ? "Expenses" : "Income"]}
           contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb", fontSize: 13 }}
         />
-        <Area
-          type="monotone"
-          dataKey="amount"
-          stroke="#1f5fd6"
-          strokeWidth={2.5}
-          fill="url(#expenseFill)"
-          animationDuration={900}
-        />
+        {hasIncome && (
+          <Area type="monotone" dataKey="income" stroke="#16a34a" strokeWidth={2.5} fill="url(#incomeFill)" animationDuration={900} name="income" />
+        )}
+        <Area type="monotone" dataKey="amount" stroke="#1f5fd6" strokeWidth={2.5} fill="url(#expenseFill)" animationDuration={900} name="amount" />
       </AreaChart>
     </ResponsiveContainer>
   );

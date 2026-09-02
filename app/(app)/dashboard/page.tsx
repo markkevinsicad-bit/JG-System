@@ -5,15 +5,21 @@ import { StatusBadge } from "@/components/ui/badge";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { ExpensesOverviewChart, ExpenseByCategoryChart } from "@/components/dashboard/charts";
+import { DashboardPeriodFilter } from "@/components/dashboard/period-filter";
 import { formatPHP, formatDate } from "@/lib/utils";
 import { requireUser } from "@/lib/auth";
-import { getDashboardData } from "@/lib/data/dashboard";
+import { getDashboardData, type DashboardPeriod } from "@/lib/data/dashboard";
 import Link from "next/link";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>;
+}) {
   const { profile } = await requireUser();
   const isAdmin = profile.role === "admin";
-  const data = await getDashboardData(profile.id, isAdmin);
+  const { period } = await searchParams;
+  const data = await getDashboardData(profile.id, isAdmin, (period as DashboardPeriod) ?? "this_month");
   const firstName = profile.full_name.split(" ")[0];
 
   return (
@@ -25,12 +31,15 @@ export default async function DashboardPage() {
             Here&apos;s what&apos;s happening with your projects today.
           </p>
         </div>
-        <Link href="/expenses/new">
-          <Button>
-            <Plus className="h-4 w-4" />
-            New Expense
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {isAdmin && <DashboardPeriodFilter />}
+          <Link href="/expenses/new">
+            <Button>
+              <Plus className="h-4 w-4" />
+              New Expense
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {isAdmin && data.projectsNearLimit.length > 0 && (
@@ -42,6 +51,22 @@ export default async function DashboardPage() {
         </div>
       )}
 
+      {isAdmin ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard label="Total Income" value={data.totalIncomeReceived} isCurrency subtext="Received this period" icon="income" tone="green" />
+          <KpiCard label="Total Expenses" value={data.totalApproved} isCurrency subtext="Approved this period" icon="expenses" tone="orange" />
+          <KpiCard
+            label="Net Cash Flow"
+            value={Math.abs(data.netCashFlow)}
+            isCurrency
+            subtext={data.netCashFlow >= 0 ? "Positive" : "Negative"}
+            icon="cashflow"
+            tone={data.netCashFlow >= 0 ? "green" : "orange"}
+          />
+          <KpiCard label="Outstanding Income" value={data.outstandingIncome} isCurrency subtext="Not yet received" icon="remaining" tone="purple" />
+        </div>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard label="Total Projects" value={data.totalProjects} subtext={`${data.activeProjectsCount} Active`} icon="projects" tone="navy" />
         {isAdmin && <KpiCard label="Total Budget" value={data.totalBudget} isCurrency subtext="All Projects" icon="budget" tone="blue" />}
@@ -49,7 +74,7 @@ export default async function DashboardPage() {
           label={isAdmin ? "Approved Expenses" : "My Approved Expenses"}
           value={data.totalApproved}
           isCurrency
-          subtext="All Time"
+          subtext="This period"
           icon="expenses"
           tone="orange"
         />
@@ -63,10 +88,10 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="animate-fade-in-up lg:col-span-2" hover>
           <CardHeader>
-            <CardTitle>Expenses Overview</CardTitle>
+            <CardTitle>{isAdmin ? "Income vs Expenses" : "Expenses Overview"}</CardTitle>
             <span className="text-xs font-medium text-gray-400">Last 6 Months</span>
           </CardHeader>
-          <ExpensesOverviewChart data={data.monthlyExpenses} />
+          <ExpensesOverviewChart data={isAdmin ? data.monthlyExpenses : data.monthlyExpenses.map(({ month, amount }) => ({ month, amount }))} />
         </Card>
 
         <Card className="animate-fade-in-up" hover>
@@ -130,7 +155,7 @@ export default async function DashboardPage() {
                       <td className="px-5 py-3">
                         <p className="font-medium text-navy">{e.description}</p>
                         <p className="text-xs text-gray-400">
-                          {e.projects?.name} • {formatDate(e.expense_date)}
+                          {e.projects?.name ?? "General"} • {formatDate(e.expense_date)}
                         </p>
                       </td>
                       <td className="px-5 py-3 font-medium text-navy">{formatPHP(Number(e.amount))}</td>

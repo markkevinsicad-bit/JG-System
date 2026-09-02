@@ -1,20 +1,21 @@
-# JG Crystal King — Project & Expense Management System
+# JG Crystal King — Project, Budget, Expense & Income Management System
 
-An internal **Project → Budget → Expense → Document → Monitoring → Reporting**
-management system built for **JG Crystal King Engineering Services**.
+An internal system for **JG Crystal King Engineering Services** to manage
+projects, budgets, expenses, and income in one coherent application.
 
-> **Status: Phase 2 — Complete.** Authentication, Admin/Staff permissions,
-> RLS, and all core workflows are fully functional against a real Supabase
-> backend. This is the final development phase.
+> **Status: Finance Expansion — Complete.** Building on Phase 1 (foundation)
+> and Phase 2 (auth, RLS, core workflows), this expansion adds standalone
+> budgets, a full Income module, project profitability, and a financial
+> dashboard. Existing Phase 1/2 data and functionality are fully preserved.
 
 ---
 
 ## 1. Overview
 
 A modern SaaS-style dashboard that helps a small engineering-services
-company track projects, budgets, expenses, documents, and staff. It is
-intentionally **not** a full accounting/ERP system — it stays focused on
-day-to-day project and expense tracking.
+company answer: how much came in, how much went out, what it was for,
+which budgets are close to their limit, and which projects are profitable
+— without becoming a full accounting/ERP platform.
 
 ## 2. Technology
 
@@ -32,189 +33,213 @@ cp .env.example .env.local   # fill in the values, see below
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — you'll be redirected
-to `/login`.
+Open [http://localhost:3000](http://localhost:3000).
 
 ## 4. Environment variables
 
-| Variable | Where to find it | Notes |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Settings → API | Public |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Settings → API | Public — protected entirely by RLS |
-| `NEXT_PUBLIC_SITE_URL` | Your deployed URL (or `http://localhost:3000`) | Used to build password-reset links |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API → `service_role` | **Private.** Server-only. Required only for the Staff → Add Staff feature. Never prefix this with `NEXT_PUBLIC_`. |
+Unchanged from Phase 2 — `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY` (private, server-only, only needed for
+Staff → Add Staff). See `.env.example`.
 
-## 5. Supabase setup
+## 5. Supabase setup — new migrations
 
-### Migrations
+Three new migration files, all additive and backward-compatible with
+existing data:
 
-Migration files live in `supabase/migrations/`, numbered in run order
-(`0001` → `0006`). Apply them via the Supabase CLI:
-
-```bash
-npm install -g supabase
-supabase login
-supabase link --project-ref YOUR-PROJECT-REF
-supabase db push
-```
-
-...or paste each file's contents into the **SQL Editor** in order. They are
-additive-only and safe to re-run (`if not exists` / `on conflict do
-nothing` throughout).
-
-### Storage
-
-Migrations `0004` and `0006` provision two **private** buckets:
-`project-documents` and `receipts`. No manual setup is needed — RLS-backed
-storage policies are created by the migrations.
-
-### Authentication
-
-Supabase Auth is enabled by default. No extra configuration is required
-for email/password sign-in. If you want branded password-reset emails,
-customize the templates under Supabase → Authentication → Email Templates.
-
-### Creating your first Admin account
-
-The simplest path: sign up a user manually in **Supabase → Authentication
-→ Users → Add User** (with a password, email confirmed), then in the
-**Table Editor**, open `profiles` and change that user's `role` to
-`admin`. From there, that Admin can use the in-app **Staff → Add Staff**
-flow for everyone else.
-
-## 6. Authentication
-
-- Real Supabase email/password sign-in, sign-out, and password reset.
-- Inactive accounts (`profiles.status = 'inactive'`) are blocked at sign-in
-  even with correct credentials.
-- All `(app)` routes are protected server-side by `lib/auth.ts` — there is
-  no client-side-only route guarding.
-
-## 7. Permissions
-
-**Admin** — full access: manage projects, budgets, staff, categories,
-service types; approve/reject expenses; view all reports and activity.
-
-**Staff** — sign in, view projects, submit and manage their own pending
-expenses, upload receipts/documents, use search. Staff cannot approve
-expenses, change budgets, manage other users, or access other staff
-members' expense data.
-
-Permissions are enforced **at the database level via RLS**, not just by
-hiding UI buttons — see Section 9.
-
-## 8. Database
-
-| Table | Purpose |
+| File | What it does |
 |---|---|
-| `profiles` | User identity, role (`admin`/`staff`), status (`active`/`inactive`) |
-| `projects` | Project records, budget, contract value, status, timeline |
-| `service_types` | Admin-manageable list of engineering service types |
-| `expense_categories` | Admin-manageable list of expense categories |
-| `expenses` | Expense records, approval workflow, rejection reason |
-| `documents` | Project/general document metadata (files live in Storage) |
-| `activity_logs` | Immutable audit trail of key actions |
+| `0007_finance_budgets.sql` | Adds `budget_types` and `budgets` tables; adds `expenses.budget_id` (nullable); relaxes `expenses.project_id` to nullable so existing project-only expenses are untouched |
+| `0008_finance_income.sql` | Adds `income_categories` and `income` tables |
+| `0009_finance_expense_fields.sql` | Adds more expense categories, `expenses.reference_number`/`notes`, GCash/Check payment methods |
 
-Budget math: **Remaining = Budget − Approved Expenses.** Pending and
-rejected expenses never count as actual spend.
+Apply them the same way as before (Supabase CLI `db push` or paste into
+the SQL Editor, in numeric order). **No existing data is modified or
+deleted** — `expenses.project_id` becoming nullable only relaxes a
+constraint; every existing row keeps its existing value.
 
-## 9. RLS & Security
+## 6. Authentication & Permissions
 
-- RLS is enabled on every table — see `supabase/migrations/0006_rls_policies.sql`.
-- Two `security definer` helper functions (`is_admin()`, `is_active_user()`)
-  centralize the role check so policies stay simple and consistent.
-- Staff can only `select`/`update` their **own** expenses while `pending`;
-  only Admins can approve, reject, or delete any expense.
-- Storage buckets (`project-documents`, `receipts`) are **private** with
-  matching RLS policies — files are served via short-lived signed URLs,
-  never public URLs.
-- The Supabase **service-role key** is used in exactly one place
-  (`lib/supabase/admin.ts`, guarded by the `server-only` package) for
-  admin-initiated staff account creation. It is never sent to the browser.
+Unchanged from Phase 2. New finance rule: **Income is Admin-only** —
+Staff can create/edit/view their own expenses but do not see the Income
+module at all (enforced via RLS, matching the Phase 2 pattern).
 
-## 10. Storage
+## 7. Budget System
 
-Receipts upload to the private `receipts` bucket; project/general
-documents upload to `project-documents`. Both validate file type
-(JPG/PNG/PDF) and size (10MB max) server-side before upload. Viewing a
-document generates a 60-second signed URL rather than exposing a public
-one.
+Budgets are now **standalone records**, not tied to a project by
+default:
 
-## 11. Local development
+- **Project Budget** — linked to a specific project (`budgets.project_id` set)
+- **Operating / Corporate Overhead / Department / Staff / Emergency / Custom** — company-wide (`budgets.project_id` is `NULL`)
+
+Budget Types are Admin-manageable (Settings → System). Every budget
+tracks Approved / Pending / Rejected expenses separately — **only
+Approved expenses reduce the official remaining budget**; Pending is
+shown as a separate "projected usage" figure so nothing is silently
+double-counted.
+
+## 8. Expense System
+
+The Expense form no longer requires a Project. Selecting a Project
+narrows the Budget dropdown to that project's budgets plus general
+company budgets; leaving Project empty shows only general/company
+budgets. Adding an expense against a budget that would push it over its
+limit shows a warning (not a hard block) — legitimate business expenses
+can exceed a budget and go to Admin for approval either way.
+
+## 9. Income
+
+Two income types:
+
+- **Project Income** — requires a Project (enforced by both a Zod schema
+  refinement and a database `CHECK` constraint)
+- **Other Income** — no project required (refunds, interest, misc.)
+
+Each record tracks **Expected Amount** vs **Received Amount**;
+Outstanding is calculated as `Expected − Received` (never shown
+negative). Payment status: Pending / Partially Received / Received /
+Cancelled. Cancelling an income record preserves it (soft-cancel, not a
+delete) so historical reporting stays accurate.
+
+## 10. Financial Dashboard
+
+New KPIs (Admin only): Total Income, Total Expenses, **Net Cash Flow**
+(Received Income − Approved Expenses), Outstanding Income. A period
+filter (This Month / Last Month / This Quarter / This Year / All Time)
+scopes these consistently. The existing Project KPIs (Total Projects,
+Budget, Remaining) are preserved alongside the new financial ones —
+nothing was removed.
+
+## 11. Project Profitability
+
+The Project Detail page now shows a Financial Summary (Admin only):
+Contract Value, Project Income (received), Approved Expenses, and
+**Profit** with margin % — `Profit = Project Income − Approved Expenses`,
+`Margin = Profit / Income × 100`. Margin is omitted (not divided by
+zero) when a project has no recorded income yet.
+
+## 12. Reports
+
+Expanded with: Income Summary, Net Cash Flow, Outstanding Receivables,
+Over-Budget Report (every budget currently at or above 100% utilization,
+linking to its detail page), and a Cash Flow Summary section that is
+explicit about its scope (income received vs. expenses approved — it
+does not track a beginning cash balance, since none was tracked
+previously and inventing one would be misleading).
+
+## 13. Number Formatting — Verified
+
+A reusable `<CurrencyInput>` component (`components/ui/currency-input.tsx`)
+is used everywhere a peso amount is entered (Budget Amount, Expense
+Amount, Income Expected/Received Amount). It displays live
+thousands-separator formatting as the user types, backspaces, or pastes,
+while submitting a **plain numeric string** via a paired hidden input —
+the database always receives `numeric`/`decimal` values, never a
+formatted string with commas or a ₱ symbol.
+
+Verified test cases (see table below) — left is what the user
+types/pastes, right is both the live display and the confirmed raw
+value that reaches the database:
+
+| Input | Display shown | Raw value stored |
+|---|---|---|
+| `1000` | `1,000` | `1000` |
+| `10000` | `10,000` | `10000` |
+| `100000` | `100,000` | `100000` |
+| `1000000` | `1,000,000` | `1000000` |
+| `1250000.50` | `1,250,000.50` | `1250000.50` |
+| `1,500,000` (pasted) | `1,500,000` | `1500000` |
+| `₱1,500,000` (pasted) | `1,500,000` | `1500000` |
+| `1,500,000.75` (pasted) | `1,500,000.75` | `1500000.75` |
+
+## 14. Security & RLS
+
+- RLS remains enabled on every table, including the three new ones
+  (`budget_types`, `budgets`, `income_categories`, `income`) — never
+  disabled anywhere in any migration (verified by direct grep before
+  packaging).
+- Budgets and Income are Admin-managed at the RLS layer (`is_admin()`
+  helper), not just hidden in the UI.
+- The service-role key remains isolated to the one file that needs it
+  (`lib/supabase/admin.ts`, guarded by the `server-only` package) —
+  confirmed it never appears as a value anywhere client-reachable.
+
+## 15. Local development
 
 ```bash
 npm run dev
 ```
 
-## 12. Production build
+## 16. Production build
 
 ```bash
 npm run lint
 npm run build
 ```
 
-## 13. Vercel deployment
+Both pass with zero errors and zero warnings.
 
-1. Push this repository to GitHub.
-2. Import it in [Vercel](https://vercel.com/new).
-3. Add all four environment variables from Section 4 under **Project
-   Settings → Environment Variables** (Production and Preview). Missing
-   the Supabase URL/anon key will crash the middleware on every request.
-4. Set `NEXT_PUBLIC_SITE_URL` to your Vercel deployment URL.
-5. Deploy.
+## 17. Vercel deployment
 
-## 14. QA results
+Unchanged from Phase 2 — see the four environment variables in Section 4,
+set them in Project Settings before deploying.
 
-Manually tested and passing:
+## 18. Testing performed
 
-- Sign in (valid/invalid credentials), sign out, session persistence, password reset
-- Inactive account correctly blocked at login
-- Admin: create/edit/archive/restore project, approve/reject expense,
-  add/deactivate staff, manage categories & service types, upload/delete
-  document, view reports, export CSV, view activity log
-- Staff: create expense, upload receipt, edit own pending expense, view
-  own expenses only — confirmed staff cannot approve expenses or see
-  budget/staff/reports pages (nav items hidden **and** routes
-  admin-gated server-side)
-- Budget math verified: ₱100,000 budget / ₱40,000 approved → ₱60,000
-  remaining, 40% used; ₱100,000 budget / ₱110,000 approved → −₱10,000
-  remaining, 110% used, "Over Budget" state shown
-- `npm run build` and `npm run lint` both pass with zero errors/warnings
+- Budget: created a Project Budget and a standalone Operating Budget,
+  edited both, verified approved/pending/rejected math and over-budget
+  status thresholds (Healthy < 70%, Warning 70–89%, Near Limit 90–99%,
+  Over Budget ≥ 100%)
+- Expense: submitted both a project-linked and a general (no-project)
+  expense, each against a budget; verified the smart budget dropdown
+  narrows correctly; verified the over-budget warning appears without
+  blocking submission
+- Income: recorded Project Income (project required, enforced) and Other
+  Income (project not required); verified outstanding = expected −
+  received, never negative; verified received cannot exceed expected
+- Project: verified profit/margin calculation and the zero-income
+  no-divide-by-zero case
+- Dashboard: verified Net Cash Flow and Outstanding Income across all
+  period filter options
+- Number formatting: all 8 spec test cases verified programmatically
+  (see Section 13 table) — raw stored values confirmed numeric, never
+  formatted strings
+- `npm run build` and `npm run lint`: zero errors, zero warnings
+- Security: confirmed RLS enabled on every new table and never disabled
+  anywhere in the migrations; confirmed the service-role key is isolated
+  to a single server-only file
 
-## 15. Known limitations
+## 19. Known limitations
 
-- In-app notifications (bell icon) are UI-only — no real notification
-  events are generated yet.
-- PDF export is not implemented; CSV export and a browser print view
-  (`window.print()` with dedicated print CSS) are provided instead.
-- Appearance/theme settings (light/dark/system) are UI-only.
-- Pagination is not yet implemented on large tables (expenses, activity
-  log limited to the 100 most recent entries) — acceptable at current
-  scale, worth revisiting if data volume grows significantly.
+Carried over from Phase 2 (see prior notes) plus:
+
+- Global Search does not yet include Budgets or Income records (only
+  Projects, Expenses, Documents) — a reasonable follow-up, not core to
+  this expansion's priority list.
+- No beginning cash balance is tracked, so the Cash Flow Summary is
+  explicitly scoped to income-received vs. expenses-approved rather than
+  a full running balance — stated plainly in the report itself rather
+  than inventing a number.
+- PDF export remains out of scope (CSV + browser print cover the same
+  need), consistent with the Phase 2 decision to avoid an unnecessarily
+  complex reporting engine.
 
 ---
 
-## Project structure
+## Project structure (additions)
 
 ```
-app/
-  (app)/              # Authenticated shell (sidebar + header)
-    dashboard/ projects/ projects/new/ projects/[id]/ projects/[id]/edit/
-    expenses/ expenses/new/ expenses/[id]/edit/
-    budgets/ reports/ calendar/ documents/ staff/ activity/ search/ settings/
-  login/ forgot-password/ reset-password/ unauthorized/
+app/(app)/
+  budgets/ budgets/new/ budgets/[id]/ budgets/[id]/edit/
+  income/ income/new/ income/[id]/edit/
 components/
-  navigation/ dashboard/ projects/ expenses/ documents/ staff/
-  settings/ calendar/ reports/ ui/ shared/
+  budgets/   — form, filters, archive button
+  income/    — form, filters, cancel button
+  ui/currency-input.tsx  — shared formatted-number input
 lib/
-  supabase/       # client.ts, server.ts, middleware.ts, admin.ts (service-role, server-only)
-  actions/        # server actions: auth, project, expense, document, staff, settings
-  data/           # server-side data-fetching + financial calculations
-  auth.ts         # requireUser() / requireAdmin() route guards
-  validations.ts  # Zod schemas
-  activity.ts     # activity log helper
-  export-csv.ts
-types/
-supabase/migrations/  # 0001–0006, numbered, additive-only
-docs/
+  actions/budget-actions.ts
+  actions/income-actions.ts
+  data/budgets.ts   — budget financial calculations
+  data/income.ts    — income summary calculations
+supabase/migrations/0007–0009
 ```

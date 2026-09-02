@@ -15,23 +15,27 @@ import {
   Flame,
   History,
   LogOut,
+  Banknote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOutAction } from "@/lib/actions/auth-actions";
 import { Profile } from "@/types";
 
 export const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
-  { href: "/projects", label: "Projects", icon: FolderKanban, adminOnly: false },
-  { href: "/expenses", label: "Expenses", icon: Receipt, adminOnly: false },
-  { href: "/budgets", label: "Budgets", icon: Wallet, adminOnly: true },
-  { href: "/reports", label: "Reports", icon: BarChart3, adminOnly: true },
-  { href: "/calendar", label: "Calendar", icon: Calendar, adminOnly: false },
-  { href: "/documents", label: "Documents", icon: FileText, adminOnly: false },
-  { href: "/staff", label: "Staff", icon: Users, adminOnly: true },
-  { href: "/activity", label: "Activity Log", icon: History, adminOnly: true },
-  { href: "/settings", label: "Settings", icon: Settings, adminOnly: false },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false, group: "Overview" },
+  { href: "/income", label: "Income", icon: Banknote, adminOnly: true, group: "Finance" },
+  { href: "/expenses", label: "Expenses", icon: Receipt, adminOnly: false, group: "Finance" },
+  { href: "/budgets", label: "Budgets", icon: Wallet, adminOnly: true, group: "Finance" },
+  { href: "/reports", label: "Reports", icon: BarChart3, adminOnly: true, group: "Finance" },
+  { href: "/projects", label: "Projects", icon: FolderKanban, adminOnly: false, group: "Projects" },
+  { href: "/calendar", label: "Calendar", icon: Calendar, adminOnly: false, group: "Projects" },
+  { href: "/documents", label: "Documents", icon: FileText, adminOnly: false, group: "Projects" },
+  { href: "/staff", label: "Staff", icon: Users, adminOnly: true, group: "Management" },
+  { href: "/activity", label: "Activity Log", icon: History, adminOnly: true, group: "Management" },
+  { href: "/settings", label: "Settings", icon: Settings, adminOnly: false, group: "Management" },
 ];
+
+const groupOrder = ["Overview", "Finance", "Projects", "Management"];
 
 export function Sidebar({ profile }: { profile: Profile }) {
   const pathname = usePathname();
@@ -51,23 +55,34 @@ export function Sidebar({ profile }: { profile: Profile }) {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3">
-        {items.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + "/");
+      <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-4">
+        {groupOrder.map((group) => {
+          const groupItems = items.filter((i) => i.group === group);
+          if (groupItems.length === 0) return null;
           return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150",
-                active
-                  ? "bg-eng-blue text-white"
-                  : "text-white/70 hover:bg-white/10 hover:text-white"
-              )}
-            >
-              <Icon className="h-[18px] w-[18px]" />
-              {label}
-            </Link>
+            <div key={group}>
+              <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/35">{group}</p>
+              <div className="space-y-1">
+                {groupItems.map(({ href, label, icon: Icon }) => {
+                  const active = pathname === href || pathname.startsWith(href + "/");
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150",
+                        active
+                          ? "bg-eng-blue text-white"
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                      )}
+                    >
+                      <Icon className="h-[18px] w-[18px]" />
+                      {label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </nav>

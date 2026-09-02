@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth";
-import { categorySchema, serviceTypeSchema } from "@/lib/validations";
+import { categorySchema, serviceTypeSchema, budgetTypeSchema, incomeCategorySchema } from "@/lib/validations";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/lib/actions/project-actions";
 
@@ -58,6 +58,56 @@ export async function toggleServiceTypeAction(id: string, isActive: boolean): Pr
   const supabase = await createClient();
   const { error } = await supabase.from("service_types").update({ is_active: !isActive }).eq("id", id);
   if (error) return { error: "We couldn't update this service type. Please try again." };
+  revalidatePath("/settings");
+  return {};
+}
+
+export async function addBudgetTypeAction(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = budgetTypeSchema.safeParse({ name: formData.get("name") });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("budget_types").insert({ name: parsed.data.name });
+  if (error) {
+    if (error.code === "23505") return { error: "This budget type already exists." };
+    return { error: "We couldn't add this budget type. Please try again." };
+  }
+
+  revalidatePath("/settings");
+  return {};
+}
+
+export async function toggleBudgetTypeAction(id: string, isActive: boolean): Promise<ActionResult> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase.from("budget_types").update({ is_active: !isActive }).eq("id", id);
+  if (error) return { error: "We couldn't update this budget type. Please try again." };
+  revalidatePath("/settings");
+  return {};
+}
+
+export async function addIncomeCategoryAction(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+  const parsed = incomeCategorySchema.safeParse({ name: formData.get("name") });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("income_categories").insert({ name: parsed.data.name });
+  if (error) {
+    if (error.code === "23505") return { error: "This income category already exists." };
+    return { error: "We couldn't add this income category. Please try again." };
+  }
+
+  revalidatePath("/settings");
+  return {};
+}
+
+export async function toggleIncomeCategoryAction(id: string, isActive: boolean): Promise<ActionResult> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase.from("income_categories").update({ is_active: !isActive }).eq("id", id);
+  if (error) return { error: "We couldn't update this income category. Please try again." };
   revalidatePath("/settings");
   return {};
 }

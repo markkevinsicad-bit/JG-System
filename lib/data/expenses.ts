@@ -17,7 +17,7 @@ export async function getExpenses(filters: ExpenseFilters) {
   let query = supabase
     .from("expenses")
     .select(
-      "*, projects(name), expense_categories(name), profiles!expenses_submitted_by_fkey(full_name)"
+      "*, projects(name), budgets(budget_name), expense_categories(name), profiles!expenses_submitted_by_fkey(full_name)"
     )
     .order("expense_date", { ascending: false });
 

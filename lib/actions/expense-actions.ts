@@ -10,12 +10,15 @@ import type { ActionResult } from "@/lib/actions/project-actions";
 function parseExpenseForm(formData: FormData) {
   return {
     project_id: formData.get("project_id"),
+    budget_id: formData.get("budget_id"),
     category_id: formData.get("category_id"),
     description: formData.get("description"),
     amount: formData.get("amount"),
     expense_date: formData.get("expense_date"),
     vendor_name: formData.get("vendor_name"),
     payment_method: formData.get("payment_method"),
+    reference_number: formData.get("reference_number"),
+    notes: formData.get("notes"),
   };
 }
 
@@ -64,7 +67,11 @@ export async function createExpenseAction(formData: FormData): Promise<ActionRes
     .from("expenses")
     .insert({
       ...parsed.data,
+      project_id: parsed.data.project_id || null,
+      budget_id: parsed.data.budget_id || null,
       vendor_name: parsed.data.vendor_name || null,
+      reference_number: parsed.data.reference_number || null,
+      notes: parsed.data.notes || null,
       status: "pending",
       submitted_by: profile.id,
       receipt_path: receiptPath,
@@ -115,7 +122,14 @@ export async function updateExpenseAction(expenseId: string, formData: FormData)
 
   const { error } = await supabase
     .from("expenses")
-    .update({ ...parsed.data, vendor_name: parsed.data.vendor_name || null })
+    .update({
+      ...parsed.data,
+      project_id: parsed.data.project_id || null,
+      budget_id: parsed.data.budget_id || null,
+      vendor_name: parsed.data.vendor_name || null,
+      reference_number: parsed.data.reference_number || null,
+      notes: parsed.data.notes || null,
+    })
     .eq("id", expenseId);
 
   if (error) return { error: "We couldn't save your changes. Please try again." };
@@ -197,6 +211,24 @@ export async function rejectExpenseAction(formData: FormData): Promise<ActionRes
   revalidatePath("/expenses");
   revalidatePath("/dashboard");
   return {};
+}
+
+export async function getBudgetSnapshotAction(budgetId: string): Promise<{
+  budgetAmount: number;
+  approved: number;
+  pending: number;
+} | null> {
+  await requireUser();
+  const supabase = await createClient();
+
+  const { data: budget } = await supabase.from("budgets").select("budget_amount").eq("id", budgetId).single();
+  if (!budget) return null;
+
+  const { data: expenses } = await supabase.from("expenses").select("amount, status").eq("budget_id", budgetId);
+  const approved = (expenses ?? []).filter((e) => e.status === "approved").reduce((s, e) => s + Number(e.amount), 0);
+  const pending = (expenses ?? []).filter((e) => e.status === "pending").reduce((s, e) => s + Number(e.amount), 0);
+
+  return { budgetAmount: Number(budget.budget_amount), approved, pending };
 }
 
 export async function deleteExpenseAction(expenseId: string): Promise<ActionResult> {

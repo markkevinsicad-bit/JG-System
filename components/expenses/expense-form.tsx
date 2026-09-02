@@ -1,20 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, FileCheck } from "lucide-react";
+import { Upload, FileCheck, AlertTriangle } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label, Select, Textarea } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/shared/toast";
-import { createExpenseAction, updateExpenseAction } from "@/lib/actions/expense-actions";
+import { createExpenseAction, updateExpenseAction, getBudgetSnapshotAction } from "@/lib/actions/expense-actions";
 import type { ActionResult } from "@/lib/actions/project-actions";
 import { Expense } from "@/types";
+import { formatPHP } from "@/lib/utils";
 
 const paymentMethods = [
   { value: "cash", label: "Cash" },
   { value: "bank_transfer", label: "Bank Transfer" },
-  { value: "card", label: "Card" },
+  { value: "card", label: "Company Card" },
+  { value: "gcash", label: "GCash" },
+  { value: "check", label: "Check" },
   { value: "other", label: "Other" },
 ];
 
@@ -22,16 +26,64 @@ export function ExpenseForm({
   expense,
   projects,
   categories,
+  generalBudgets,
+  projectBudgets,
 }: {
   expense?: Expense;
   projects: { id: string; name: string }[];
   categories: { id: string; name: string }[];
+  generalBudgets: { id: string; budget_name: string; project_id: string | null }[];
+  projectBudgets: { id: string; budget_name: string; project_id: string | null }[];
 }) {
   const router = useRouter();
   const { showToast } = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ActionResult>({});
   const [fileName, setFileName] = useState<string | null>(null);
+  const [selectedProject, setSelectedProject] = useState(expense?.project_id ?? "");
+  const [selectedBudget, setSelectedBudget] = useState(expense?.budget_id ?? "");
+  const [amount, setAmount] = useState(expense?.amount ?? 0);
+  const [budgetWarning, setBudgetWarning] = useState<string | null>(null);
+
+  const availableBudgets = selectedProject
+    ? projectBudgets.filter((b) => b.project_id === selectedProject || b.project_id === null)
+    : generalBudgets.filter((b) => b.project_id === null);
+
+  function handleProjectChange(newProjectId: string) {
+    setSelectedProject(newProjectId);
+    const nextAvailable = newProjectId
+      ? projectBudgets.filter((b) => b.project_id === newProjectId || b.project_id === null)
+      : generalBudgets.filter((b) => b.project_id === null);
+    if (!nextAvailable.some((b) => b.id === selectedBudget)) {
+      setSelectedBudget("");
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedBudget || !amount || amount <= 0) {
+      return;
+    }
+
+    getBudgetSnapshotAction(selectedBudget).then((snapshot) => {
+      if (cancelled || !snapshot) return;
+      const projected = snapshot.approved + snapshot.pending + amount;
+      if (projected > snapshot.budgetAmount) {
+        const over = projected - snapshot.budgetAmount;
+        setBudgetWarning(
+          `This expense would put the budget ${formatPHP(over)} over budget (projected ${formatPHP(projected)} of ${formatPHP(snapshot.budgetAmount)}).`
+        );
+      } else {
+        setBudgetWarning(null);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedBudget, amount]);
+
+  const showBudgetWarning = selectedBudget && amount > 0 ? budgetWarning : null;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -69,14 +121,18 @@ export function ExpenseForm({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <Label htmlFor="project_id">Project</Label>
-            <Select id="project_id" name="project_id" defaultValue={expense?.project_id ?? ""} required>
-              <option value="" disabled>Select project</option>
+            <Label htmlFor="project_id">Project (optional)</Label>
+            <Select
+              id="project_id"
+              name="project_id"
+              value={selectedProject}
+              onChange={(e) => handleProjectChange(e.target.value)}
+            >
+              <option value="">None / General Company Expense</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </Select>
-            {err("project_id") && <p className="mt-1 text-xs text-red">{err("project_id")}</p>}
           </div>
           <div>
             <Label htmlFor="category_id">Category</Label>
@@ -91,6 +147,32 @@ export function ExpenseForm({
         </div>
 
         <div>
+          <Label htmlFor="budget_id">Budget</Label>
+          <Select
+            id="budget_id"
+            name="budget_id"
+            value={selectedBudget}
+            onChange={(e) => setSelectedBudget(e.target.value)}
+          >
+            <option value="">No specific budget</option>
+            {availableBudgets.map((b) => (
+              <option key={b.id} value={b.id}>{b.budget_name}</option>
+            ))}
+          </Select>
+          <p className="mt-1 text-xs text-gray-400">
+            {selectedProject
+              ? "Showing budgets for this project, plus general company budgets."
+              : "Showing general/company-wide budgets."}
+          </p>
+          {showBudgetWarning && (
+            <div className="mt-2 flex items-start gap-2 rounded-lg bg-orange-light px-3 py-2 text-xs text-orange">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {showBudgetWarning}
+            </div>
+          )}
+        </div>
+
+        <div>
           <Label htmlFor="description">Description</Label>
           <Textarea id="description" name="description" rows={3} defaultValue={expense?.description} placeholder="What was this expense for?" required />
           {err("description") && <p className="mt-1 text-xs text-red">{err("description")}</p>}
@@ -98,8 +180,14 @@ export function ExpenseForm({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <Label htmlFor="amount">Amount (₱)</Label>
-            <Input id="amount" name="amount" type="number" min="0.01" step="0.01" defaultValue={expense?.amount} placeholder="0.00" required />
+            <Label htmlFor="amount">Amount</Label>
+            <CurrencyInput
+              id="amount"
+              name="amount"
+              defaultValue={expense?.amount}
+              required
+              onValueChange={setAmount}
+            />
             {err("amount") && <p className="mt-1 text-xs text-red">{err("amount")}</p>}
           </div>
           <div>
@@ -111,7 +199,7 @@ export function ExpenseForm({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <Label htmlFor="vendor_name">Vendor / Supplier</Label>
+            <Label htmlFor="vendor_name">Vendor / Payee</Label>
             <Input id="vendor_name" name="vendor_name" defaultValue={expense?.vendor_name ?? ""} placeholder="Optional" />
           </div>
           <div>
@@ -122,6 +210,17 @@ export function ExpenseForm({
                 <option key={m.value} value={m.value}>{m.label}</option>
               ))}
             </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="reference_number">Reference Number (optional)</Label>
+            <Input id="reference_number" name="reference_number" defaultValue={expense?.reference_number ?? ""} placeholder="PO / Invoice #" />
+          </div>
+          <div>
+            <Label htmlFor="notes">Notes (optional)</Label>
+            <Input id="notes" name="notes" defaultValue={expense?.notes ?? ""} />
           </div>
         </div>
 

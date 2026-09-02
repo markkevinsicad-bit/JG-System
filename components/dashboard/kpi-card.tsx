@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FolderKanban, Wallet, Receipt, PiggyBank } from "lucide-react";
+import { FolderKanban, Wallet, Receipt, PiggyBank, Banknote, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 type Tone = "navy" | "blue" | "green" | "orange" | "purple";
-export type KpiIconName = "projects" | "budget" | "expenses" | "remaining";
+export type KpiIconName = "projects" | "budget" | "expenses" | "remaining" | "income" | "cashflow";
 
 const iconMap = {
   projects: FolderKanban,
   budget: Wallet,
   expenses: Receipt,
   remaining: PiggyBank,
+  income: Banknote,
+  cashflow: TrendingUp,
 };
 
 const iconTone: Record<Tone, string> = {

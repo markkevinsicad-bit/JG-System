@@ -7,9 +7,16 @@ export default async function SettingsPage() {
   const isAdmin = profile.role === "admin";
   const supabase = await createClient();
 
-  const [{ data: categories }, { data: serviceTypes }] = await Promise.all([
+  const [
+    { data: categories },
+    { data: serviceTypes },
+    { data: budgetTypes },
+    { data: incomeCategories },
+  ] = await Promise.all([
     isAdmin ? supabase.from("expense_categories").select("*").order("name") : Promise.resolve({ data: [] }),
     isAdmin ? supabase.from("service_types").select("*").order("name") : Promise.resolve({ data: [] }),
+    isAdmin ? supabase.from("budget_types").select("*").order("name") : Promise.resolve({ data: [] }),
+    isAdmin ? supabase.from("income_categories").select("*").order("name") : Promise.resolve({ data: [] }),
   ]);
 
   return (
@@ -24,6 +31,8 @@ export default async function SettingsPage() {
         isAdmin={isAdmin}
         categories={categories ?? []}
         serviceTypes={serviceTypes ?? []}
+        budgetTypes={budgetTypes ?? []}
+        incomeCategories={incomeCategories ?? []}
       />
     </div>
   );

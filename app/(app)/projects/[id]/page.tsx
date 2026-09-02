@@ -38,7 +38,21 @@ export default async function ProjectDetailPage({
     .eq("project_id", id)
     .order("created_at", { ascending: false });
 
-  const [{ data: expenses }, { data: documents }] = await Promise.all([expensesQuery, documentsQuery]);
+  const incomeQuery = isAdmin
+    ? supabase.from("income").select("expected_amount, received_amount, payment_status").eq("project_id", id)
+    : Promise.resolve({ data: [] as { expected_amount: number; received_amount: number; payment_status: string }[] });
+
+  const [{ data: expenses }, { data: documents }, { data: projectIncome }] = await Promise.all([
+    expensesQuery,
+    documentsQuery,
+    incomeQuery,
+  ]);
+
+  const totalProjectIncome = (projectIncome ?? [])
+    .filter((i) => i.payment_status !== "cancelled")
+    .reduce((s, i) => s + Number(i.received_amount), 0);
+  const profit = totalProjectIncome - project.approved_expenses;
+  const profitMargin = totalProjectIncome > 0 ? (profit / totalProjectIncome) * 100 : null;
 
   const tone = project.percent_used >= 100 ? "red" : project.percent_used >= 90 ? "orange" : "blue";
 
@@ -131,6 +145,23 @@ export default async function ProjectDetailPage({
         )}
       </div>
 
+      {isAdmin && (
+        <Card className="animate-fade-in-up" hover>
+          <CardHeader><CardTitle>Financial Summary</CardTitle></CardHeader>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <FinancialStat label="Contract Value" value={formatPHP(project.contract_value)} />
+            <FinancialStat label="Project Income" value={formatPHP(totalProjectIncome)} tone="text-green" />
+            <FinancialStat label="Approved Expenses" value={formatPHP(project.approved_expenses)} tone="text-orange" />
+            <FinancialStat
+              label="Profit"
+              value={formatPHP(profit)}
+              tone={profit >= 0 ? "text-green" : "text-red"}
+              subtext={profitMargin !== null ? `${profitMargin.toFixed(1)}% margin` : "No income recorded yet"}
+            />
+          </div>
+        </Card>
+      )}
+
       <Card className="animate-fade-in-up overflow-hidden !p-0" hover>
         <div className="flex items-center justify-between p-5 pb-0">
           <CardTitle>Recent Expenses</CardTitle>
@@ -202,6 +233,26 @@ function Info({ label, value }: { label: string; value: string }) {
     <div>
       <dt className="text-xs font-medium text-gray-400">{label}</dt>
       <dd className="mt-0.5 text-sm font-medium text-navy">{value}</dd>
+    </div>
+  );
+}
+
+function FinancialStat({
+  label,
+  value,
+  tone = "text-navy",
+  subtext,
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+  subtext?: string;
+}) {
+  return (
+    <div>
+      <p className="text-xs text-gray-400">{label}</p>
+      <p className={`mt-0.5 text-lg font-bold ${tone}`}>{value}</p>
+      {subtext && <p className="mt-0.5 text-xs text-gray-400">{subtext}</p>}
     </div>
   );
 }

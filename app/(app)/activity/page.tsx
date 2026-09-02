@@ -31,6 +31,12 @@ const actionTone: Record<string, "green" | "red" | "orange" | "blue" | "purple" 
   staff_updated: "orange",
   staff_activated: "green",
   staff_deactivated: "red",
+  budget_created: "blue",
+  budget_updated: "orange",
+  budget_archived: "gray",
+  income_created: "green",
+  income_updated: "orange",
+  income_cancelled: "red",
 };
 
 export default async function ActivityLogPage() {

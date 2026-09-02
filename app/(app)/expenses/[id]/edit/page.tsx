@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getProjectOptions, getCategoryOptions } from "@/lib/data/expenses";
+import { getBudgetsForProject } from "@/lib/data/budgets";
 import { ExpenseForm } from "@/components/expenses/expense-form";
 
 export default async function EditExpensePage({ params }: { params: Promise<{ id: string }> }) {
@@ -17,7 +18,12 @@ export default async function EditExpensePage({ params }: { params: Promise<{ id
     redirect("/expenses");
   }
 
-  const [projects, categories] = await Promise.all([getProjectOptions(), getCategoryOptions()]);
+  const [projects, categories, generalBudgets, { data: allProjectBudgets }] = await Promise.all([
+    getProjectOptions(),
+    getCategoryOptions(),
+    getBudgetsForProject(null),
+    supabase.from("budgets").select("id, budget_name, project_id").eq("status", "active").not("project_id", "is", null),
+  ]);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -25,7 +31,13 @@ export default async function EditExpensePage({ params }: { params: Promise<{ id
         <h1 className="text-2xl font-bold text-navy">Edit Expense</h1>
         <p className="mt-1 text-sm text-gray-500">Update the details of this expense.</p>
       </div>
-      <ExpenseForm expense={expense} projects={projects} categories={categories} />
+      <ExpenseForm
+        expense={expense}
+        projects={projects}
+        categories={categories}
+        generalBudgets={generalBudgets}
+        projectBudgets={[...generalBudgets, ...(allProjectBudgets ?? [])]}
+      />
     </div>
   );
 }
